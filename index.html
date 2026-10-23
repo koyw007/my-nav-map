@@ -3,16 +3,16 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>천체 방위각 하이브리드 내비게이터 v7.1</title>
+    <title>천체 방위각 하이브리드 내비게이터 v7.2</title>
     <style>
         * { box-sizing: border-box; }
-        body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, sans-serif; background-color: #111111; }
+        body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, sans-serif; background-color: #ffffff; }
         #map-container { width: 100%; height: 100%; position: absolute; top: 0; left: 0; z-index: 10; border: none; }
         #google-map-frame { width: 100%; height: 100%; border: none; pointer-events: auto; }
         #canvas-container { width: 100%; height: 100%; position: absolute; top: 0; left: 0; z-index: 20; display: flex; align-items: center; justify-content: center; pointer-events: none; }
         #navCanvas { background-color: transparent !important; display: block; }
         .mobile-ui-container { position: absolute; top: 0; left: 0; z-index: 9999; pointer-events: none; width: 100%; height: 100%; padding: 16px; display: flex; flex-direction: column; justify-content: space-between; }
-        .info-card { background: rgba(255, 255, 255, 0.96); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); padding: 14px; border-radius: 12px; box-shadow: 0 4px 16px rgba(0,0,0,0.4); pointer-events: auto; max-width: 300px; width: 100%; }
+        .info-card { background: rgba(255, 255, 255, 0.96); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); padding: 14px; border-radius: 12px; box-shadow: 0 4px 16px rgba(0,0,0,0.3); pointer-events: auto; max-width: 300px; width: 100%; }
         .card-title { font-weight: 700; font-size: 14px; color: #222; margin-bottom: 6px; }
         .data-text { font-size: 12px; color: #444; line-height: 1.6; }
         .auth-btn { display: block; width: 100%; background: #007aff; color: white; border: none; border-radius: 6px; padding: 9px 10px; font-weight: bold; font-size: 12px; margin-top: 10px; cursor: pointer; text-align: center; }
@@ -29,7 +29,7 @@
     <div id="canvas-container"><canvas id="navCanvas"></canvas></div>
     <div class="mobile-ui-container">
         <div class="info-card">
-            <div class="card-title">🧭 천체 방위각 내비게이터 (v7.1)</div>
+            <div class="card-title">🧭 천체 방위각 내비게이터 (v7.2)</div>
             <div id="gps-status" class="status-badge status-searching">위치 수신 대기 중</div>
             <div id="gps-data" class="data-text" style="margin-top: 8px;">스마트폰 GPS 권한을 연동해 주세요.</div>
             <button class="auth-btn" onclick="requestGPSPermission()">🛰️ 위치 권한 강제 연동</button>
@@ -65,7 +65,9 @@
         function onLocationUpdate(pos) {
             userLat = Number(pos.coords.latitude); userLng = Number(pos.coords.longitude);
             updateStatus("success", "GPS 연동 성공 🟢");
-            const mapUrl = `https://google.com{userLat},${userLng}&z=17&t=m&output=embed&iwloc=near`;
+            
+            // [오류 해결 핵심] 깨졌던 주소 템플릿 문법 구조를 정상 수치 변수 연동으로 전면 수정
+            const mapUrl = "https://google.com" + userLat + "," + userLng + "&z=17&t=m&output=embed&iwloc=near";
             if (mapFrame.src !== mapUrl) { mapFrame.src = mapUrl; }
             drawNavigationSystem();
         }
@@ -83,7 +85,7 @@
             ctx.save(); ctx.translate(cx, cy);
             if (isCompassActive) { ctx.rotate(-deviceHeading * Math.PI / 180); }
             
-            ctx.strokeStyle = 'rgba(255, 0, 0, 0.15)'; ctx.lineWidth = 1;
+            ctx.strokeStyle = 'rgba(0, 0, 0, 0.1)'; ctx.lineWidth = 1;
             for (let r = maxR / 3; r <= maxR; r += maxR / 3) {
                 ctx.beginPath(); ctx.arc(0, 0, r, 0, 2 * Math.PI); ctx.stroke();
             }
