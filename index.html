@@ -3,14 +3,16 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>천체 방위각 내비게이터 v6.0</title>
+    <title>천체 방위각 하이브리드 내비게이터 v7.1</title>
     <style>
         * { box-sizing: border-box; }
         body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, sans-serif; background-color: #111111; }
-        #canvas-container { width: 100%; height: 100%; position: absolute; top: 0; left: 0; z-index: 10; display: flex; align-items: center; justify-content: center; }
-        #navCanvas { background-color: #161616; display: block; }
+        #map-container { width: 100%; height: 100%; position: absolute; top: 0; left: 0; z-index: 10; border: none; }
+        #google-map-frame { width: 100%; height: 100%; border: none; pointer-events: auto; }
+        #canvas-container { width: 100%; height: 100%; position: absolute; top: 0; left: 0; z-index: 20; display: flex; align-items: center; justify-content: center; pointer-events: none; }
+        #navCanvas { background-color: transparent !important; display: block; }
         .mobile-ui-container { position: absolute; top: 0; left: 0; z-index: 9999; pointer-events: none; width: 100%; height: 100%; padding: 16px; display: flex; flex-direction: column; justify-content: space-between; }
-        .info-card { background: rgba(255, 255, 255, 0.96); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); padding: 14px; border-radius: 12px; box-shadow: 0 4px 16px rgba(0,0,0,0.5); pointer-events: auto; max-width: 300px; width: 100%; }
+        .info-card { background: rgba(255, 255, 255, 0.96); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); padding: 14px; border-radius: 12px; box-shadow: 0 4px 16px rgba(0,0,0,0.4); pointer-events: auto; max-width: 300px; width: 100%; }
         .card-title { font-weight: 700; font-size: 14px; color: #222; margin-bottom: 6px; }
         .data-text { font-size: 12px; color: #444; line-height: 1.6; }
         .auth-btn { display: block; width: 100%; background: #007aff; color: white; border: none; border-radius: 6px; padding: 9px 10px; font-weight: bold; font-size: 12px; margin-top: 10px; cursor: pointer; text-align: center; }
@@ -23,10 +25,11 @@
     </style>
 </head>
 <body>
+    <div id="map-container"><iframe id="google-map-frame" src="about:blank"></iframe></div>
     <div id="canvas-container"><canvas id="navCanvas"></canvas></div>
     <div class="mobile-ui-container">
         <div class="info-card">
-            <div class="card-title">🧭 천체 방위 내비게이터 (v6.0)</div>
+            <div class="card-title">🧭 천체 방위각 내비게이터 (v7.1)</div>
             <div id="gps-status" class="status-badge status-searching">위치 수신 대기 중</div>
             <div id="gps-data" class="data-text" style="margin-top: 8px;">스마트폰 GPS 권한을 연동해 주세요.</div>
             <button class="auth-btn" onclick="requestGPSPermission()">🛰️ 위치 권한 강제 연동</button>
@@ -41,7 +44,7 @@
         </div>
     </div>
     <script>
-        const canvas = document.getElementById('navCanvas'), ctx = canvas.getContext('2d');
+        const canvas = document.getElementById('navCanvas'), ctx = canvas.getContext('2d'), mapFrame = document.getElementById('google-map-frame');
         let userLat = 35.8714, userLng = 128.6014, isCompassActive = false, deviceHeading = 0, watchId = null, radarRadius = 0;
 
         function resizeCanvas() {
@@ -52,7 +55,7 @@
         requestGPSPermission(); resizeCanvas();
 
         function requestGPSPermission() {
-            updateStatus("searching", "GPS 신호 요청 중...");
+            updateStatus("searching", "GPS 신호 강력 요청 중...");
             if (navigator.geolocation) {
                 if (watchId !== null) navigator.geolocation.clearWatch(watchId);
                 navigator.geolocation.getCurrentPosition(onLocationUpdate, onLocationError, { enableHighAccuracy: true, timeout: 10000 });
@@ -61,7 +64,10 @@
         }
         function onLocationUpdate(pos) {
             userLat = Number(pos.coords.latitude); userLng = Number(pos.coords.longitude);
-            updateStatus("success", "GPS 연동 성공 🟢"); drawNavigationSystem();
+            updateStatus("success", "GPS 연동 성공 🟢");
+            const mapUrl = `https://google.com{userLat},${userLng}&z=17&t=m&output=embed&iwloc=near`;
+            if (mapFrame.src !== mapUrl) { mapFrame.src = mapUrl; }
+            drawNavigationSystem();
         }
         function onLocationError(err) {
             let msg = "GPS 신호 없음"; if(err.code === 1) msg = "위치 권한 거부됨 🔴";
@@ -77,31 +83,24 @@
             ctx.save(); ctx.translate(cx, cy);
             if (isCompassActive) { ctx.rotate(-deviceHeading * Math.PI / 180); }
             
-            // 나침반 지형 방위판 정밀 시각화
-            ctx.strokeStyle = '#2d2d2d'; ctx.lineWidth = 1;
-            for (let r = maxR / 4; r <= maxR; r += maxR / 4) {
+            ctx.strokeStyle = 'rgba(255, 0, 0, 0.15)'; ctx.lineWidth = 1;
+            for (let r = maxR / 3; r <= maxR; r += maxR / 3) {
                 ctx.beginPath(); ctx.arc(0, 0, r, 0, 2 * Math.PI); ctx.stroke();
             }
-            ctx.beginPath(); ctx.moveTo(-maxR, 0); ctx.lineTo(maxR, 0); ctx.moveTo(0, -maxR); ctx.lineTo(0, maxR); ctx.stroke();
-
-            // 실시간 태양 천체 알고리즘 구동
             const time = new Date();
             const decimalHours = time.getHours() + time.getMinutes() / 60;
             let sunAzimuth = (decimalHours - 12) * 15 + 180;
             if (sunAzimuth < 0) sunAzimuth += 360; if (sunAzimuth >= 360) sunAzimuth -= 360;
             document.getElementById('gps-data').innerHTML = `<b>위도:</b> ${userLat.toFixed(5)}°<br><b>경도:</b> ${userLng.toFixed(5)}°<br><b>태양 방위각:</b> ${sunAzimuth.toFixed(1)}°`;
 
-            // 🔴 진북 투사선
             ctx.save(); ctx.rotate(0); ctx.strokeStyle = '#ff3b30'; ctx.lineWidth = 5;
             ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(0, -maxR); ctx.stroke();
             ctx.fillStyle = '#ff3b30'; ctx.beginPath(); ctx.moveTo(0, -maxR); ctx.lineTo(-12, -maxR + 18); ctx.lineTo(12, -maxR + 18); ctx.fill(); ctx.restore();
 
-            // 🔵 태양 투사선
             ctx.save(); ctx.rotate(sunAzimuth * Math.PI / 180); ctx.strokeStyle = '#007aff'; ctx.lineWidth = 5;
             ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(0, -maxR); ctx.stroke();
             ctx.fillStyle = '#007aff'; ctx.beginPath(); ctx.arc(0, -maxR, 10, 0, 2 * Math.PI); ctx.fill(); ctx.restore();
 
-            // 중심 핀 정렬
             ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.arc(0, 0, 8, 0, 2 * Math.PI); ctx.fill();
             ctx.strokeStyle = '#007aff'; ctx.lineWidth = 2; ctx.stroke();
 
@@ -124,6 +123,7 @@
             if (isCompassActive) {
                 window.removeEventListener('deviceorientation', handleOrientation); window.removeEventListener('deviceorientationabsolute', handleOrientation);
                 deviceHeading = 0; isCompassActive = false; drawNavigationSystem();
+                if(mapFrame) mapFrame.style.transform = "none";
             } else {
                 if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
                     DeviceOrientationEvent.requestPermission().then(response => { if (response === 'granted') startCompassListening(); }).catch(console.error);
@@ -139,7 +139,10 @@
             let heading = event.alpha;
             if (event.webkitCompassHeading) heading = event.webkitCompassHeading;
             else if (event.absolute === true || event.absolute === undefined) heading = 360 - event.alpha;
-            if (heading !== undefined && heading !== null) { deviceHeading = heading; drawNavigationSystem(); }
+            if (heading !== undefined && heading !== null) { 
+                deviceHeading = heading; drawNavigationSystem(); 
+                if(mapFrame) mapFrame.style.transform = `rotate(${-heading}deg)`;
+            }
         }
     </script>
 </body>
