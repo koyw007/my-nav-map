@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>모바일 천체 방위각 내비게이터 v3.0 (마커 마킹 엔진)</title>
+    <title>모바일 천체 방위각 내비게이터 v3.1 (완전 디버깅본)</title>
     <link rel="stylesheet" href="https://unpkg.com" />
     <style>
         * { box-sizing: border-box; }
@@ -11,7 +11,6 @@
         #map-container { width: 100%; height: 100%; position: absolute; top: 0; left: 0; z-index: 10; }
         #map { width: 100%; height: 100%; }
         
-        /* UI 정보 카드 및 제어 버튼 레이어 정의 */
         .mobile-ui-container { position: absolute; top: 0; left: 0; z-index: 9999; pointer-events: none; width: 100%; height: 100%; padding: 16px; display: flex; flex-direction: column; justify-content: space-between; }
         .info-card { background: rgba(255, 255, 255, 0.96); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); padding: 14px; border-radius: 12px; box-shadow: 0 4px 16px rgba(0,0,0,0.2); pointer-events: auto; max-width: 300px; width: 100%; }
         .card-title { font-weight: 700; font-size: 14px; color: #222; margin-bottom: 6px; }
@@ -27,7 +26,6 @@
         .status-success { background-color: #34c759; }
         .status-error { background-color: #ff3b30; }
 
-        /* [핵심] 화살표 마커 전용 회전 CSS 스타일 내장 */
         .arrow-marker {
             transition: transform 0.1s linear;
             transform-origin: center center;
@@ -42,7 +40,7 @@
 
     <div class="mobile-ui-container">
         <div class="info-card">
-            <div class="card-title">🧭 천체 방위각 내비게이터 (v3.0)</div>
+            <div class="card-title">🧭 천체 방위각 내비게이터 (v3.1)</div>
             <div id="gps-status" class="status-badge status-searching">위치 수신 대기 중</div>
             <div id="gps-data" class="data-text" style="margin-top: 8px;">스마트폰 GPS 권한을 연동해 주세요.</div>
             <button class="auth-btn" onclick="requestGPSPermission()">🛰️ 위치 권한 강제 연동</button>
@@ -64,7 +62,6 @@
         let isCompassActive = false;
         let watchId = null;
 
-        // 안정성 구글 맵 기동
         map = L.map('map', { zoomControl: false, trackResize: true, fadeAnimation: false }).setView([userLat, userLng], 16);
         L.tileLayer('https://google.com{x}&y={y}&z={z}', { maxZoom: 20 }).addTo(map);
 
@@ -105,18 +102,15 @@
             badge.innerText = text;
         }
 
-        // [핵심 보정] 마커 아이콘 회전 마킹 렌더링 엔진
         function drawNavigationMarkers() {
             if (userMarker) map.removeLayer(userMarker);
             if (northMarker) map.removeLayer(northMarker);
             if (sunMarker) map.removeLayer(sunMarker);
             if (accuracyCircle) map.removeLayer(accuracyCircle);
 
-            // 1. 내 위치 마커 및 포커싱 원형(Radius Projection) 그리기
             userMarker = L.marker([userLat, userLng]).addTo(map);
-            accuracyCircle = L.circle([userLat, userLng], { radius: 100, color: '#007aff', fillColor: '#007aff', fillOpacity: 0.08, weight: 1 }).addTo(map);
+            accuracyCircle = L.circle([userLat, userLng], { radius: 60, color: '#007aff', fillColor: '#007aff', fillOpacity: 0.08, weight: 1 }).addTo(map);
 
-            // 2. 실시간 시간 기준 정밀 태양 방위각 산출
             const time = new Date();
             const decimalHours = time.getHours() + time.getMinutes() / 60;
             let sunAzimuth = (decimalHours - 12) * 15 + 180;
@@ -125,14 +119,13 @@
 
             document.getElementById('gps-data').innerHTML = `<b>위도:</b> ${userLat.toFixed(5)}°<br><b>경도:</b> ${userLng.toFixed(5)}°<br><b>태양 방위각:</b> ${sunAzimuth.toFixed(1)}°`;
 
-            // 3. 브라우저 차단이 불가능한 SVG 정밀 마커 정의 (진북 0도 화살표)
-            const northHtml = `<div class="arrow-marker" style="transform: rotate(0deg); width:60px; height:60px; margin-left:-30px; margin-top:-30px; display:flex; justify-content:center; align-items:center;"><span style="color:#ff3b30; font-size:32px; font-weight:bold; filter: drop-shadow(0px 2px 4px rgba(0,0,0,0.4));">▲</span></div>`;
-            const northIcon = L.divIcon({ html: northHtml, className: '', iconSize: [60, 60] });
+            // [수정 완결] iconSize 규격을 [60, 60] 및 [80, 80] 배열로 정밀 삽입하여 브라우저 가독성 오류 전면 제거
+            const northHtml = `<div class="arrow-marker" style="transform: rotate(0deg); width:60px; height:60px; display:flex; justify-content:center; align-items:center;"><span style="color:#ff3b30; font-size:32px; font-weight:bold; filter: drop-shadow(0px 2px 4px rgba(0,0,0,0.4));">▲</span></div>`;
+            const northIcon = L.divIcon({ html: northHtml, className: '', iconSize:, iconAnchor: [30, 30] });
             northMarker = L.marker([userLat, userLng], { icon: northIcon }).addTo(map);
 
-            // 4. 태양 방위각 화살표 마커 정의 (태양 각도만큼 회전 투사)
-            const sunHtml = `<div class="arrow-marker" style="transform: rotate(${sunAzimuth}deg); width:80px; height:80px; margin-left:-40px; margin-top:-40px; display:flex; flex-direction:column; justify-content:flex-start; align-items:center;"><span style="color:#007aff; font-size:36px; font-weight:bold; filter: drop-shadow(0px 2px 4px rgba(0,0,0,0.4));">↑</span><span style="font-size:14px; margin-top:-5px;">☀️</span></div>`;
-            const sunIcon = L.divIcon({ html: sunHtml, className: '', iconSize: [80, 80] });
+            const sunHtml = `<div class="arrow-marker" style="transform: rotate(${sunAzimuth}deg); width:80px; height:80px; display:flex; flex-direction:column; justify-content:flex-start; align-items:center;"><span style="color:#007aff; font-size:36px; font-weight:bold; filter: drop-shadow(0px 2px 4px rgba(0,0,0,0.4));">↑</span><span style="font-size:14px; margin-top:-5px;">☀️</span></div>`;
+            const sunIcon = L.divIcon({ html: sunHtml, className: '', iconSize:, iconAnchor: [40, 40] });
             sunMarker = L.marker([userLat, userLng], { icon: sunIcon }).addTo(map);
         }
 
