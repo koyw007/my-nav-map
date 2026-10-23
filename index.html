@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>모바일 천체 방위각 지도 v2.7 (최상단 오버레이 보정)</title>
+    <title>모바일 천체 방위각 지도 v2.8 (선 표출 원천 보정)</title>
     <link rel="stylesheet" href="https://unpkg.com" />
     <style>
         * { box-sizing: border-box; }
@@ -35,7 +35,7 @@
 
     <div class="mobile-ui-container">
         <div class="info-card">
-            <div class="card-title">🧭 천체 방위각 내비게이터 (v2.7)</div>
+            <div class="card-title">🧭 천체 방위각 내비게이터 (v2.8)</div>
             <div id="gps-status" class="status-badge status-searching">위치 수신 대기 중</div>
             <div id="gps-data" class="data-text" style="margin-top: 8px;">스마트폰 GPS 권한을 연동해 주세요.</div>
             <button class="auth-btn" onclick="requestGPSPermission()">🛰️ 위치 권한 강제 연동</button>
@@ -63,17 +63,21 @@
             fadeAnimation: false
         }).setView([userLat, userLng], 16);
         
-        // 초안정성 구글 지도 백엔드 탑재
+        // [수정 핵심 1] 진북/태양선 전용 최상단 커스텀 판(Pane) 강제 창조
+        map.createPane('linePane');
+        map.getPane('linePane').style.zIndex = 650; // 구글 지도보다 훨씬 위, 마커와 비슷한 최상위 높이 고정
+        map.getPane('linePane').style.pointerEvents = 'none';
+
+        // 초안정성 구글 지도 백엔드 탑재 (기본 바닥 레이어)
         L.tileLayer('https://google.com{x}&y={y}&z={z}', {
             maxZoom: 20,
             attribution: 'Google Maps'
         }).addTo(map);
 
-        // 지도 렌더링 강제 안정화 루틴
         function systemLayerReset() {
             if (map) { map.invalidateSize(); }
         }
-        setInterval(systemLayerReset, 1500);
+        setInterval(systemLayerReset, 2000);
 
         requestGPSPermission();
 
@@ -115,7 +119,6 @@
             if (northLine) map.removeLayer(northLine);
             if (sunLine) map.removeLayer(sunLine);
 
-            // 마커 생성
             userMarker = L.marker([userLat, userLng]).addTo(map);
 
             // 실시간 시간 기준 정밀 태양 방위각 역산
@@ -127,25 +130,25 @@
 
             document.getElementById('gps-data').innerHTML = `<b>위도:</b> ${userLat.toFixed(5)}°<br><b>경도:</b> ${userLng.toFixed(5)}°<br><b>태양 방위각:</b> ${sunAzimuth.toFixed(1)}°`;
 
-            function calculateTargetCoords(lat, lng, angle, distance = 4000) {
+            function calculateTargetCoords(lat, lng, angle, distance = 5000) {
                 const earthRadius = 6378137;
                 const latRad = (distance * Math.cos(angle * Math.PI / 180)) / earthRadius;
                 const lngRad = (distance * Math.sin(angle * Math.PI / 180)) / (earthRadius * Math.cos(lat * Math.PI / 180));
                 return [lat + (latRad * 180 / Math.PI), lng + (lngRad * 180 / Math.PI)];
             }
 
-            // [핵심 변경] 구글 지도 레이어 무조건 최상단(shadowPane 그룹)으로 선 강제 바인딩 유도
+            // [수정 핵심 2] 새로 창조한 독점 레이어(linePane)에 선을 강제로 바인딩하여 무조건 표출
             northLine = L.polyline([[userLat, userLng], calculateTargetCoords(userLat, userLng, 0)], { 
                 color: '#ff3b30', 
                 weight: 6, 
                 dashArray: '10, 10',
-                pane: 'shadowPane' 
+                pane: 'linePane' 
             }).addTo(map);
 
             sunLine = L.polyline([[userLat, userLng], calculateTargetCoords(userLat, userLng, sunAzimuth)], { 
                 color: '#007aff', 
                 weight: 6,
-                pane: 'shadowPane'
+                pane: 'linePane'
             }).addTo(map);
         }
 
